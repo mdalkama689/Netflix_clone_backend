@@ -2,17 +2,17 @@ import { Schema, model } from "mongoose"
 const userSchema = new Schema ({
 username: {
     type: String,
-    required: true,
+    required: [true, 'Username is required'],
     unique: true 
 },
 email: {
     type: String,
-    required: true,
+    required: [true, 'Email is required'],
     unique: true 
 },
 password: {
     type: String,
-    required: true,
+    required: [true, 'Password is required'],
     select: false
 },
 profilePic:{
@@ -23,19 +23,8 @@ isAdmin: {
     type: Boolean,
     default: false
 },
-otp: {
-    type: Number,
-    required: true,
-},
-createdAt: {
-    type: Date,
-    default: Date.now()
-},
-isUsed: {
-    type: Boolean,
-    default: false
-}
 }, {
+
     timestamps: true
 })
 const User = model('user', userSchema)
