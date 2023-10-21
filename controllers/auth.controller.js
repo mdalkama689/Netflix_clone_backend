@@ -5,6 +5,8 @@ import cron from 'node-cron'
 import encryptPassword from '../utils/encryptPassword.js';
 import encryptOTP from '../utils/encryptOTP.js';
 import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
+
 
 // Schedule the cleanup task to run every 5 minutes
 cron.schedule('*/5 * * * *', async () => {
@@ -15,7 +17,7 @@ cron.schedule('*/5 * * * *', async () => {
     await OTP.deleteMany({ otpExpiry: { $lt: fiveMinutesAgo } });
     // "Cleaned up expired OTPs.
   } catch (error) {
-console.log(error.message);
+    console.log(error.message);
   }
 })
 
@@ -46,16 +48,16 @@ const sendOtp = async (req, res, next) => {
     // generate otp
     const otp = generateOTP()
     const saltRounds = 10; // Choose an appropriate number of salt rounds
-const otpHash = await encryptOTP(otp, saltRounds); // Hash the OTP
+    const otpHash = await encryptOTP(otp, saltRounds); // Hash the OTP
     // otp expiry time
     const otpExpiry = Date.now() + 5 * 60 * 1000  // 5 minutes validity
     // send email
     sendEmail(email, otp)
     console.log(otp);
-   // Create OTP entry in MongoDB
+    // Create OTP entry in MongoDB
     const otpDocument = await new OTP({
-     email,
-     otp: otpHash,
+      email,
+      otp: otpHash,
       otpExpiry
     })
     // save in db
@@ -125,41 +127,41 @@ const verifyOtp = async (req, res, next) => {
 // REGISTER USER
 const registerUser = async (req, res, next) => {
   try {
-const { email, password, username } = req.body 
-if (!email || !password || !username) {
-  return res.status(400).json({
-    success: false,
-    message: 'All fields is required'
-  })
-}
-const userExistsWithUsername = await User.findOne({ username })
-if (userExistsWithUsername) {
-  return res.status(400).json({
-    success: false,
-    message: 'Username already registered'
-  })
-}
-const userExistsWithEmail = await User.findOne({ email })
-if (userExistsWithEmail) {
-  return res.status(400).json({
-    success: false,
-    message: 'Email already registered'
-  })
-}
-const saltRounds = 10
-const encryptedPassword = await encryptPassword(password, saltRounds)
-const user = await User.create({
-  email,
-  username,
-  password: encryptedPassword
-})
-await user.save()
-user.password = undefined
-res.status(200).json({
-  success: true,
-  message: 'User registered successfully',
-  user
-})
+    const { email, password, username } = req.body
+    if (!email || !password || !username) {
+      return res.status(400).json({
+        success: false,
+        message: 'All fields is required'
+      })
+    }
+    const userExistsWithUsername = await User.findOne({ username })
+    if (userExistsWithUsername) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username already registered'
+      })
+    }
+    const userExistsWithEmail = await User.findOne({ email })
+    if (userExistsWithEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already registered'
+      })
+    }
+    const saltRounds = 10
+    const encryptedPassword = await encryptPassword(password, saltRounds)
+    const user = await User.create({
+      email,
+      username,
+      password: encryptedPassword
+    })
+    await user.save()
+    user.password = undefined
+    res.status(200).json({
+      success: true,
+      message: 'User registered successfully',
+      user
+    })
   } catch (error) {
     res.status(400).json({
       success: false,
@@ -167,16 +169,55 @@ res.status(200).json({
     })
   }
 }
+
 // LOGIN USER
 const loginUser = async (req, res, next) => {
   try {
-const {email, password} = req.body 
-if (!email || !password) {
-  return res.status(200).json({
-    success: false,
-    message: 'All fields is required'
-  })
-}
+    const { email, password } = req.body
+    // check email and password
+    if (!email || !password) {
+      return res.status(200).json({
+        success: false,
+        message: 'All fields is required'
+      })
+    }
+    // check user exists or not
+    const userExists = await User.findOne({ email }).select('+password')
+    if (!userExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'User not registered'
+      })
+    }
+    const correctPassword = await bcrypt.compare(password, userExists.password)
+    if (!correctPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Incorrect Password'
+      })
+    }
+    // payload
+    const payload = {
+      id: userExists.id,
+      username: userExists.username,
+      email: userExists.email,
+      profilePic: userExists.profilePic,
+      isAdmin: userExists.isAdmin
+    }
+    const secretKey = process.env.SECRET_KEY
+    const token = jwt.sign(payload, secretKey, { expiresIn: '7d' })
+    const options = {
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      httpOnly: true
+    }
+    res.cookie('token', token, options)
+    console.log(token);
+    userExists.password = undefined
+    res.status(200).json({
+      success: true,
+      message: 'User login successfully',
+      userExists
+    })
   } catch (error) {
     res.status(200).json({
       success: false,
@@ -185,10 +226,26 @@ if (!email || !password) {
   }
 }
 
+//  LOGOUT USER
+const logoutUser = async (req, res, next) => {
+  try {
+    res.clearCookie('token')
+    res.status(200).json({
+      success: true,
+      message: 'User logout successfully'
+    })
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Failed to logout'
+    })
+  }
+}
 
 export {
   sendOtp,
   verifyOtp,
   registerUser,
-  loginUser
+  loginUser,
+  logoutUser
 }
