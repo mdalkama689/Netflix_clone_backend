@@ -21,7 +21,7 @@ const updateUserDetails = async (req, res, next) => {
       const encryptedPassword = await encryptPassword(
         req.body.password,
         saltRounds
-      )
+      );
       updatedUserData.password = encryptedPassword;
     }
     if (Object.keys(updatedUserData).length === 0) {
@@ -33,7 +33,7 @@ const updateUserDetails = async (req, res, next) => {
     if (id === req.params.id || isAdmin) {
       updatedUser = await User.findByIdAndUpdate(id, updatedUserData, {
         new: true,
-      })
+      });
       return res.status(200).json({
         success: true,
         message: "User details updated successfully",
@@ -77,52 +77,95 @@ const userDeleted = async (req, res, next) => {
       message: error.message,
     });
   }
-}
+};
 
 // GET
 const getUser = async (req, res, next) => {
-   try {
-    const { id } = req.params
-    const user = await User.findById(id)
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
     if (!user) {
-        return res.status(200).json({
-            success: false,
-            message: 'User not found'
-        })
+      return res.status(200).json({
+        success: false,
+        message: "User not found",
+      });
     }
     res.status(200).json({
-        success: true,
-        message: 'User found successfully',
-        user
-    })
-   } catch (error) {
+      success: true,
+      message: "User found successfully",
+      user,
+    });
+  } catch (error) {
     res.status(400).json({
-        success: false,
-        message: error.message
-    })
-   }
-}
+      success: false,
+      message: error.message,
+    });
+  }
+};
 // GET ALL
 const getAllUsers = async (req, res, next) => {
-try {
-    const users = await User.find()
-    let userMap = users.map((user) => {return user._doc});
-    res.status(200).json({
-       userMap
-    })
-} catch (error) {
-    res.status(200).json({
-        success: false,
-        message: error.message
-    })
-}
-}
-//
-// GET USER STATS
+  try {
+    let users;
+    if (req.user.isAdmin) {
+      users = await User.find();
+    }
 
-export { 
-    updateUserDetails, 
-    userDeleted,
-    getUser,
-    getAllUsers
- };
+    res.status(200).json({
+      success: true,
+      message: "User data fetch successfully",
+      users,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// GET USER STATS
+const getUserStats = async (req, res, next) => {
+  try {
+    const today = new Date();
+    const lastYear = today.setFullYear(today.setFullYear() - 1);
+    const months = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+    const data = await User.aggregate([
+      {
+        $project: {
+          month: { $month: "$createdAt" },
+        },
+      },
+      {
+        $group: {
+          _id: "$month",
+          total: { $sum: 1 },
+        },
+      },
+    ]);
+    res.status(200).json({
+      success: true,
+      message: "Fetch all data successfully",
+      data,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export { updateUserDetails, userDeleted, getUser, getAllUsers, getUserStats };
