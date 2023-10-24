@@ -10,7 +10,7 @@ const listScehma = new Schema(
     type: {
       type: String,
     },
-    genere: {
+    genre: {
       type: String,
     },
     content: {

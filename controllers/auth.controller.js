@@ -6,6 +6,7 @@ import encryptPassword from "../utils/encryptPassword.js";
 import encryptOTP from "../utils/encryptOTP.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import generateOTP from '../utils/generateOTP.js'
 
 // Schedule the cleanup task to run every 5 minutes
 cron.schedule("*/5 * * * *", async () => {
@@ -24,11 +25,12 @@ cron.schedule("*/5 * * * *", async () => {
 const sendOtp = async (req, res, next) => {
   try {
     const { email } = req.body;
+    console.log(email);
     // check email
     if (!email) {
-      return res.status(400).json({
+      return res.status(401).json({
         success: false,
-        message: "Please enter the email",
+        message: "Please the enter the email",
       });
     }
     // check user exists or not
@@ -64,10 +66,11 @@ const sendOtp = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: "OTP send successfully",
+      email
     });
   } catch (error) {
     // if error occure
-    res.status(400).json({
+    res.status(401).json({
       success: false,
       message: error.message || "Failed to send OTP",
     });
